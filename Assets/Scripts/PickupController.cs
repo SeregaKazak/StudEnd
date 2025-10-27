@@ -33,7 +33,7 @@ public class PickupController : MonoBehaviour
 
         if (Physics.Raycast(ray, out hit, pickupDistance))
         {
-            if (hit.collider.CompareTag("Pickable") && !isHolding)
+            if (hit.collider.CompareTag("Item") && !isHolding)
             {
                 isLookingAtObject = true;
                 return;
@@ -45,7 +45,7 @@ public class PickupController : MonoBehaviour
 
     void HandleInput()
     {
-        if (Input.GetKeyDown(KeyCode.E))
+        if (Input.GetKeyDown(KeyCode.F))
         {
             if (!isHolding && isLookingAtObject)
             {
@@ -65,7 +65,7 @@ public class PickupController : MonoBehaviour
 
         if (Physics.Raycast(ray, out hit, pickupDistance))
         {
-            if (hit.collider.CompareTag("Pickable"))
+            if (hit.collider.CompareTag("Item"))
             {
                 heldObject = hit.collider.gameObject;
                 heldObjectRb = heldObject.GetComponent<Rigidbody>();
@@ -130,7 +130,7 @@ public class PickupController : MonoBehaviour
         if (isLookingAtObject && !isHolding)
         {
             GUI.Label(new Rect(Screen.width / 2 - 100, Screen.height / 2 + 50, 200, 30),
-                     "Чтобы понять, нажмите 'E'");
+                     "Нажмите 'F' чтобы поднять");
         }
     }
 }
