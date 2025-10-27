@@ -24,16 +24,20 @@ public class PlayerController : MonoBehaviour
 
     private void Update()
     {
-        // Обработка движения
+        // РџСЂРѕРІРµСЂСЏРµРј, РЅРµ РїСЂРёРѕСЃС‚Р°РЅРѕРІР»РµРЅР° Р»Рё РёРіСЂР°
+        if (GameStateManager.Instance != null && GameStateManager.Instance.IsGamePaused)
+            return;
+            
+        //   пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
         float horizontalInput = Input.GetAxis("Horizontal");
         float verticalInput = Input.GetAxis("Vertical");
 
         Vector3 moveDirection = transform.forward * verticalInput + transform.right * horizontalInput;
 
-        // Обработка прыжка
+        // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ
         if (controller.isGrounded)
         {
-            verticalVelocity = -0.5f; // Небольшая отрицательная скорость для прижатия к земле
+            verticalVelocity = -0.5f; // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅ
 
             if (Input.GetButtonDown("Jump"))
             {
@@ -42,15 +46,15 @@ public class PlayerController : MonoBehaviour
         }
         else
         {
-            verticalVelocity -= 25.81f * Time.deltaTime; // Гравитация
+            verticalVelocity -= 25.81f * Time.deltaTime; // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
         }
 
         moveDirection.y = verticalVelocity;
 
-        // Обработка приседания
+        // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
         HandleCrouch();
 
-        // Применение движения
+        // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
         float currentSpeed = isCrouching ? crouchSpeed : moveSpeed;
         controller.Move(moveDirection * currentSpeed * Time.deltaTime);
     }

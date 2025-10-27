@@ -12,6 +12,10 @@ public class CameraController : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
+        // Проверяем, не приостановлена ли игра
+        if (GameStateManager.Instance != null && GameStateManager.Instance.IsGamePaused)
+            return;
+            
         float mouseX = Input.GetAxis("Mouse X");
         float mouseY = Input.GetAxis("Mouse Y");
 
