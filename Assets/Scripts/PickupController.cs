@@ -33,6 +33,15 @@ public class PickupController : MonoBehaviour
 
     void CheckObject()
     {
+        Vector3 mousePosition = Input.mousePosition;
+
+        // Check if the mouse position is within the screen bounds
+        if (mousePosition.x < 0 || mousePosition.y < 0 || mousePosition.x > Screen.width || mousePosition.y > Screen.height)
+        {
+            Debug.LogWarning("Mouse position is out of screen bounds!");
+            return;
+        }
+
         // Проверяем предметы по центру экрана (для подбора в инвентарь)
         Ray centerRay = new Ray(playerCamera.transform.position, playerCamera.transform.forward);
         RaycastHit centerHit;
@@ -142,8 +151,8 @@ public class PickupController : MonoBehaviour
                 if (heldObjectRb != null)
                 {
                     heldObjectRb.useGravity = false;
-                    heldObjectRb.drag = 10;
-                    heldObjectRb.angularDrag = 10;
+                    heldObjectRb.linearDamping = 10;
+                    heldObjectRb.angularDamping = 10;
                 }
 
                 isHolding = true;
@@ -160,7 +169,7 @@ public class PickupController : MonoBehaviour
 
         if (heldObjectRb != null)
         {
-            heldObjectRb.velocity = (targetPosition - heldObject.transform.position) * smoothSpeed;
+            heldObjectRb.linearVelocity = (targetPosition - heldObject.transform.position) * smoothSpeed;
 
             // ����������� ��������
             heldObjectRb.angularVelocity = Vector3.zero;
@@ -185,8 +194,8 @@ public class PickupController : MonoBehaviour
         if (heldObjectRb != null)
         {
             heldObjectRb.useGravity = true;
-            heldObjectRb.drag = 1;
-            heldObjectRb.angularDrag = 0.5f;
+            heldObjectRb.linearDamping = 1;
+            heldObjectRb.angularDamping = 0.5f;
         }
 
         heldObject = null;

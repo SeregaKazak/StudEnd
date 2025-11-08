@@ -23,7 +23,8 @@ public class CameraController : MonoBehaviour
 
         rotationX -= mouseY * sensitivity;
         rotationX = Mathf.Clamp(rotationX, -maxYAngle, maxYAngle);
-        transform.localRotation = Quaternion.Euler(rotationX, 0.0f, 0.0f);
+        transform.localRotation = Quaternion.Euler(rotationX, transform.localEulerAngles.y, 0.0f);
+
     }
 
 }

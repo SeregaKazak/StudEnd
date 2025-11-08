@@ -1,0 +1,11 @@
+{
+    "asset": "000cd25feba7a58489f25894832142be",
+    "fileName": "019a63c2-300d-7505-8cbe-9167088da6b3.pose.json",
+    "prompt": "The animation of staying character",
+    "negativePrompt": "",
+    "model": "9e46c009-67d8-4254-a3a0-32e3168247ee",
+    "modelName": "Text to Motion",
+    "customSeed": 1374879122,
+    "w3CTraceId": "0870835175b678a9d4c5b49c157f69ff",
+    "isTrimmed": false
+}
