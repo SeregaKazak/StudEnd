@@ -14,6 +14,8 @@ public class PickupController : MonoBehaviour
     private bool isLookingAtObject = false;
     private bool isHolding = false;
     private string lookAtItemName = "";
+    private float originalDrag;
+    private float originalAngularDrag;
 
     void Start()
     {
@@ -150,9 +152,13 @@ public class PickupController : MonoBehaviour
 
                 if (heldObjectRb != null)
                 {
+                    // Сохраняем оригинальные значения
+                    originalDrag = heldObjectRb.drag;
+                    originalAngularDrag = heldObjectRb.angularDrag;
+                    
                     heldObjectRb.useGravity = false;
-                    heldObjectRb.linearDamping = 10;
-                    heldObjectRb.angularDamping = 10;
+                    heldObjectRb.drag = 10;
+                    heldObjectRb.angularDrag = 10;
                 }
 
                 isHolding = true;
@@ -169,7 +175,7 @@ public class PickupController : MonoBehaviour
 
         if (heldObjectRb != null)
         {
-            heldObjectRb.linearVelocity = (targetPosition - heldObject.transform.position) * smoothSpeed;
+            heldObjectRb.velocity = (targetPosition - heldObject.transform.position) * smoothSpeed;
 
             // ����������� ��������
             heldObjectRb.angularVelocity = Vector3.zero;
@@ -194,8 +200,8 @@ public class PickupController : MonoBehaviour
         if (heldObjectRb != null)
         {
             heldObjectRb.useGravity = true;
-            heldObjectRb.linearDamping = 1;
-            heldObjectRb.angularDamping = 0.5f;
+            heldObjectRb.drag = originalDrag;
+            heldObjectRb.angularDrag = originalAngularDrag;
         }
 
         heldObject = null;
