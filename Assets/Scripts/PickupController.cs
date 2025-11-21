@@ -1,5 +1,4 @@
 using UnityEngine;
-using System.Collections;
 
 public class PickupController : MonoBehaviour
 {
@@ -16,16 +15,26 @@ public class PickupController : MonoBehaviour
     private string lookAtItemName = "";
     private float originalDrag;
     private float originalAngularDrag;
+    private IGameStateService gameStateService;
+    private IPlayerInputService inputService;
+    private IInventory inventory;
+    private IItemPickupService pickupService;
 
     void Start()
     {
         playerCamera = Camera.main;
+        CacheServices();
+    }
+
+    void OnEnable()
+    {
+        CacheServices();
     }
 
     void Update()
     {
         // Проверяем, не приостановлена ли игра
-        if (GameStateManager.Instance != null && GameStateManager.Instance.IsGamePaused)
+        if (IsGamePaused())
             return;
             
         CheckObject();
@@ -35,6 +44,13 @@ public class PickupController : MonoBehaviour
 
     void CheckObject()
     {
+        if (playerCamera == null)
+        {
+            playerCamera = Camera.main;
+            if (playerCamera == null)
+                return;
+        }
+
         Vector3 mousePosition = Input.mousePosition;
 
         // Check if the mouse position is within the screen bounds
@@ -78,14 +94,17 @@ public class PickupController : MonoBehaviour
 
     void HandleInput()
     {
+        bool interactPressed = inputService != null ? inputService.ConsumeInteract() : Input.GetKeyDown(KeyCode.E);
+        bool grabTogglePressed = inputService != null ? inputService.ConsumeGrabToggle() : Input.GetKeyDown(KeyCode.F);
+
         // Подбор в инвентарь (E)
-        if (Input.GetKeyDown(KeyCode.E) && !isHolding && !string.IsNullOrEmpty(lookAtItemName))
+        if (interactPressed && !isHolding && !string.IsNullOrEmpty(lookAtItemName))
         {
             PickUpToInventory();
         }
         
         // Таскание предметов (F)
-        if (Input.GetKeyDown(KeyCode.F))
+        if (grabTogglePressed)
         {
             if (!isHolding && isLookingAtObject)
             {
@@ -100,41 +119,18 @@ public class PickupController : MonoBehaviour
 
     void PickUpToInventory()
     {
-        // Находим предмет по центру экрана
-        Ray ray = new Ray(playerCamera.transform.position, playerCamera.transform.forward);
-        RaycastHit hit;
+        CacheServices();
 
-        if (Physics.Raycast(ray, out hit, pickupDistance))
+        if (pickupService == null || inventory == null)
+            return;
+
+        string itemName = lookAtItemName;
+        bool success = pickupService.TryPickupCenteredItem(playerCamera, pickupDistance, inventory);
+        if (success)
         {
-            if (hit.collider.CompareTag("Item"))
-            {
-                // Передаем предмет в инвентарь через SimpleInventory
-                SimpleInventory inventoryScript = FindObjectOfType<SimpleInventory>();
-                if (inventoryScript != null)
-                {
-                    // Создаем данные предмета
-                    SimpleInventory.ItemData data = new SimpleInventory.ItemData();
-                    data.itemName = hit.collider.name;
-                    
-                    // Сохраняем оригинальный префаб
-                    data.prefab = hit.collider.gameObject;
-                    
-                    // Создаём копию для хранения в инвентаре
-                    GameObject storedPrefab = Instantiate(data.prefab);
-                    storedPrefab.SetActive(false);
-                    data.prefab = storedPrefab;
-                    
-                    // Добавляем в инвентарь
-                    inventoryScript.inventory.Add(data);
-                    
-                    // Удаляем оригинальный объект
-                    Destroy(hit.collider.gameObject);
-                    
-                    Debug.Log("Подобран предмет в инвентарь: " + data.itemName);
-                }
-                
-                lookAtItemName = "";
-            }
+            string logName = string.IsNullOrEmpty(itemName) ? "неизвестный предмет" : itemName;
+            Debug.Log("Подобран предмет в инвентарь: " + logName);
+            lookAtItemName = "";
         }
     }
 
@@ -224,5 +220,73 @@ public class PickupController : MonoBehaviour
             GUI.Label(new Rect(Screen.width / 2 - 120, Screen.height / 2 + 80, 240, 30),
                      "Нажмите F чтобы тащить предмет");
         }
+    }
+
+    private void CacheServices()
+    {
+        if (gameStateService == null)
+        {
+            if (!GameServiceLocator.TryGet(out gameStateService))
+            {
+                gameStateService = FindObjectOfType<GameStateManager>();
+                if (gameStateService != null)
+                {
+                    GameServiceLocator.Register<IGameStateService>(gameStateService);
+                }
+            }
+        }
+
+        if (inputService == null)
+        {
+            if (!GameServiceLocator.TryGet(out inputService))
+            {
+                inputService = FindObjectOfType<PlayerInputService>();
+                if (inputService != null)
+                {
+                    GameServiceLocator.Register<IPlayerInputService>(inputService);
+                }
+            }
+        }
+
+        if (inventory == null)
+        {
+            if (!GameServiceLocator.TryGet(out inventory))
+            {
+                var simpleInventory = FindObjectOfType<SimpleInventory>();
+                if (simpleInventory != null)
+                {
+                    inventory = simpleInventory;
+                    GameServiceLocator.Register<IInventory>(inventory);
+                }
+            }
+        }
+
+        if (pickupService == null)
+        {
+            if (!GameServiceLocator.TryGet(out pickupService))
+            {
+                pickupService = FindObjectOfType<ItemPickupService>();
+                if (pickupService != null)
+                {
+                    GameServiceLocator.Register<IItemPickupService>(pickupService);
+                }
+                else
+                {
+                    GameObject serviceObject = new GameObject("ItemPickupService");
+                    pickupService = serviceObject.AddComponent<ItemPickupService>();
+                    DontDestroyOnLoad(serviceObject);
+                }
+            }
+        }
+    }
+
+    private bool IsGamePaused()
+    {
+        if (gameStateService == null)
+            GameServiceLocator.TryGet(out gameStateService);
+
+        return gameStateService != null
+            ? gameStateService.IsGamePaused
+            : (GameStateManager.Instance != null && GameStateManager.Instance.IsGamePaused);
     }
 }

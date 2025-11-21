@@ -1,29 +1,51 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.UI;
 
-public class SimpleInventory : MonoBehaviour
+public class SimpleInventory : MonoBehaviour, IInventory
 {
-    [System.Serializable]
-    public class ItemData
-    {
-        public string itemName;
-        public GameObject prefab; // Ссылка на оригинальный объект
-    }
-
-    public List<ItemData> inventory = new List<ItemData>();
+    [SerializeField] private List<InventoryItemData> initialItems = new List<InventoryItemData>();
     private bool isInventoryOpen = false;
-    private bool canMove = true;
     private int selectedItemIndex = -1;
-    
+
     [Header("3D Item Preview")]
     public Camera previewCamera;
     public Transform previewParent;
     public float rotationSpeed = 2f;
     private GameObject currentPreviewItem;
 
+    private readonly InventoryModel model = new InventoryModel();
+    private IPlayerInputService inputService;
+    private IGameStateService gameStateService;
+
+    public event Action<InventoryItemData> ItemAdded
+    {
+        add => model.ItemAdded += value;
+        remove => model.ItemAdded -= value;
+    }
+
+    public event Action<InventoryItemData> ItemRemoved
+    {
+        add => model.ItemRemoved += value;
+        remove => model.ItemRemoved -= value;
+    }
+
+    public IReadOnlyList<InventoryItemData> Items => model.Items;
+
+    private void Awake()
+    {
+        GameServiceLocator.Register<IInventory>(this);
+    }
+
+    private void OnDestroy()
+    {
+        GameServiceLocator.Unregister<IInventory>();
+    }
+
     void Start()
     {
+        CacheServices();
+
         // Автоматически создаем объекты для превью если они не назначены
         if (previewParent == null)
         {
@@ -47,47 +69,29 @@ public class SimpleInventory : MonoBehaviour
             previewCamera.enabled = false; // Отключаем по умолчанию
             previewCamera.depth = 10; // Рендерим поверх всего
         }
+
+        // Загружаем первоначальные предметы
+        foreach (var item in initialItems)
+        {
+            if (item != null)
+            {
+                model.TryAdd(item);
+            }
+        }
+    }
+
+    void OnEnable()
+    {
+        CacheServices();
     }
 
     void Update()
     {
         // Открытие/закрытие инвентаря
-        if (Input.GetKeyDown(KeyCode.I))
+        bool toggleInventory = inputService != null ? inputService.ConsumeToggleInventory() : Input.GetKeyDown(KeyCode.I);
+        if (toggleInventory)
         {
-            isInventoryOpen = !isInventoryOpen;
-            canMove = !isInventoryOpen;
-            
-            // При закрытии инвентаря очищаем превью
-            if (!isInventoryOpen)
-            {
-                if (currentPreviewItem != null)
-                {
-                    DestroyImmediate(currentPreviewItem);
-                    currentPreviewItem = null;
-                }
-                selectedItemIndex = -1;
-                
-                // Отключаем камеру превью
-                if (previewCamera != null)
-                {
-                    previewCamera.enabled = false;
-                }
-            }
-            
-            // Используем GameStateManager для управления состоянием игры
-            if (GameStateManager.Instance != null)
-            {
-                if (isInventoryOpen)
-                    GameStateManager.Instance.PauseGame();
-                else
-                    GameStateManager.Instance.ResumeGame();
-            }
-            else
-            {
-                // Fallback на старый способ, если GameStateManager недоступен
-                Cursor.lockState = isInventoryOpen ? CursorLockMode.None : CursorLockMode.Locked;
-                Cursor.visible = isInventoryOpen;
-            }
+            ToggleInventory();
         }
         
         // Вращение предмета в превью
@@ -111,12 +115,12 @@ public class SimpleInventory : MonoBehaviour
         }
     }
     
-    void CreatePreviewItem(ItemData item)
+    void CreatePreviewItem(InventoryItemData item)
     {
         // Удаляем предыдущий превью
         if (currentPreviewItem != null)
         {
-            DestroyImmediate(currentPreviewItem);
+            Destroy(currentPreviewItem);
         }
         
         if (item.prefab != null)
@@ -176,7 +180,7 @@ public class SimpleInventory : MonoBehaviour
             float buttonHeight = Screen.height * 0.04f; // 4% высоты экрана
             float buttonSpacing = Screen.height * 0.005f; // 0.5% отступ между кнопками
 
-            for (int i = 0; i < inventory.Count; i++)
+            for (int i = 0; i < Items.Count; i++)
             {
                 Rect buttonRect = new Rect(margin * 2, margin * 3 + i * (buttonHeight + buttonSpacing), 
                                           inventoryWidth - margin * 3, buttonHeight);
@@ -187,20 +191,20 @@ public class SimpleInventory : MonoBehaviour
                     GUI.backgroundColor = Color.yellow;
                 }
                 
-                if (GUI.Button(buttonRect, inventory[i].itemName))
+                if (GUI.Button(buttonRect, Items[i].itemName))
                 {
                     selectedItemIndex = i;
-                    Debug.Log("Выбран предмет: " + inventory[i].itemName);
+                    Debug.Log("Выбран предмет: " + Items[i].itemName);
                     
                     // Создаем превью при выборе
-                    CreatePreviewItem(inventory[i]);
+                    CreatePreviewItem(Items[i]);
                 }
                 
                 GUI.backgroundColor = Color.white;
             }
             
             // Область для 3D превью - показываем только если предмет выбран
-            if (selectedItemIndex >= 0 && selectedItemIndex < inventory.Count && currentPreviewItem != null)
+            if (selectedItemIndex >= 0 && selectedItemIndex < Items.Count && currentPreviewItem != null)
             {
                 // Адаптивная область превью
                 float previewWidth = Screen.width * 0.4f; // 40% ширины экрана
@@ -222,28 +226,19 @@ public class SimpleInventory : MonoBehaviour
                          "Зажмите ЛКМ для вращения предмета");
             }
 
-            if (selectedItemIndex >= 0 && selectedItemIndex < inventory.Count)
+            if (selectedItemIndex >= 0 && selectedItemIndex < Items.Count)
             {
                 float useButtonY = inventoryHeight - buttonHeight - margin;
                 if (GUI.Button(new Rect(margin * 2, useButtonY, inventoryWidth - margin * 3, buttonHeight), 
-                              "Использовать " + inventory[selectedItemIndex].itemName))
+                              "Использовать " + Items[selectedItemIndex].itemName))
                 {
-                    DropItem(inventory[selectedItemIndex]);
-                    inventory.RemoveAt(selectedItemIndex);
-                    selectedItemIndex = -1;
-                    
-                    // Удаляем превью если предмет был использован
-                    if (currentPreviewItem != null)
-                    {
-                        DestroyImmediate(currentPreviewItem);
-                        currentPreviewItem = null;
-                    }
+                    UseItem(selectedItemIndex);
                 }
             }
         }
     }
 
-    void DropItem(ItemData item)
+    void DropItem(InventoryItemData item)
     {
         if (item.prefab != null)
         {
@@ -256,6 +251,91 @@ public class SimpleInventory : MonoBehaviour
                 clone.tag = "Item";
                 clone.SetActive(true);
                 Debug.Log("Предмет выпал: " + item.itemName);
+            }
+        }
+    }
+
+    public bool TryAdd(InventoryItemData item) => model.TryAdd(item);
+
+    public bool TryRemoveAt(int index, out InventoryItemData removedItem) => model.TryRemoveAt(index, out removedItem);
+
+    private void ToggleInventory()
+    {
+        isInventoryOpen = !isInventoryOpen;
+
+        if (!isInventoryOpen)
+        {
+            ClearPreview();
+        }
+
+        if (gameStateService == null)
+        {
+            GameServiceLocator.TryGet(out gameStateService);
+        }
+
+        if (gameStateService != null)
+        {
+            if (isInventoryOpen)
+                gameStateService.PauseGame();
+            else
+                gameStateService.ResumeGame();
+        }
+        else
+        {
+            Cursor.lockState = isInventoryOpen ? CursorLockMode.None : CursorLockMode.Locked;
+            Cursor.visible = isInventoryOpen;
+        }
+    }
+
+    private void ClearPreview()
+    {
+        if (currentPreviewItem != null)
+        {
+            Destroy(currentPreviewItem);
+            currentPreviewItem = null;
+        }
+
+        selectedItemIndex = -1;
+
+        if (previewCamera != null)
+        {
+            previewCamera.enabled = false;
+        }
+    }
+
+    private void UseItem(int index)
+    {
+        if (model.TryRemoveAt(index, out InventoryItemData item))
+        {
+            DropItem(item);
+            selectedItemIndex = -1;
+            ClearPreview();
+        }
+    }
+
+    private void CacheServices()
+    {
+        if (inputService == null)
+        {
+            if (!GameServiceLocator.TryGet(out inputService))
+            {
+                inputService = FindObjectOfType<PlayerInputService>();
+                if (inputService != null)
+                {
+                    GameServiceLocator.Register<IPlayerInputService>(inputService);
+                }
+            }
+        }
+
+        if (gameStateService == null)
+        {
+            if (!GameServiceLocator.TryGet(out gameStateService))
+            {
+                gameStateService = FindObjectOfType<GameStateManager>();
+                if (gameStateService != null)
+                {
+                    GameServiceLocator.Register<IGameStateService>(gameStateService);
+                }
             }
         }
     }
