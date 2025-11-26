@@ -27,8 +27,13 @@ public class PlayerController : MonoBehaviour
     private bool wasGrounded = true;
     private float currentDirection = 0f; // храним текущее направление, чтобы не сбрасывать резко
 
+    private IPlayerInputService inputService;
+    private IGameStateService gameStateService;
+
     private void Start()
     {
+        CacheServices();
+
         controller = GetComponent<CharacterController>();
         if (controller == null)
         {
@@ -54,12 +59,12 @@ public class PlayerController : MonoBehaviour
     private void Update()
     {
         // Проверяем, не приостановлена ли игра
-        if (GameStateManager.Instance != null && GameStateManager.Instance.IsGamePaused)
+        if (IsGamePaused())
             return;
 
-        // Îáðàáîòêà äâèæåíèÿ
-        float horizontalInput = Input.GetAxis("Horizontal");
-        float verticalInput = Input.GetAxis("Vertical");
+        Vector2 moveAxis = GetMoveAxis();
+        float horizontalInput = moveAxis.x;
+        float verticalInput = moveAxis.y;
 
         Vector3 moveDirection = transform.forward * verticalInput + transform.right * horizontalInput;
 
@@ -95,7 +100,7 @@ public class PlayerController : MonoBehaviour
             animator.SetFloat("VerticalVelocity", verticalVelocity);
         }
 
-        // Îáðàáîòêà ïðûæêà
+        // Обработка прыжка
         bool isGrounded = controller.isGrounded;
 
         // если только что приземлились
@@ -114,7 +119,8 @@ public class PlayerController : MonoBehaviour
         }
         else if (isGrounded)
         {
-            if (Input.GetButtonDown("Jump"))
+            bool jumpPressed = inputService != null ? inputService.JumpPressedThisFrame : Input.GetButtonDown("Jump");
+            if (jumpPressed)
             {
                 verticalVelocity = jumpForce;
 
@@ -154,7 +160,7 @@ public class PlayerController : MonoBehaviour
 
         moveDirection.y = verticalVelocity;
 
-        // Îáðàáîòêà ïðèñåäàíèÿ
+        // Обработка приседания
         HandleCrouch();
 
         // Ïðèìåíåíèå äâèæåíèÿ
@@ -165,17 +171,70 @@ public class PlayerController : MonoBehaviour
         wasGrounded = isGrounded;
     }
 
+    private void OnEnable()
+    {
+        CacheServices();
+    }
+
     private void HandleCrouch()
     {
-        if (Input.GetKeyDown(KeyCode.LeftControl))
+        bool crouchPressed = inputService != null ? inputService.ConsumeCrouchPressed() : Input.GetKeyDown(KeyCode.LeftControl);
+        bool crouchReleased = inputService != null ? inputService.ConsumeCrouchReleased() : Input.GetKeyUp(KeyCode.LeftControl);
+
+        if (crouchPressed)
         {
             isCrouching = true;
             controller.height = crouchHeight;
         }
-        else if (Input.GetKeyUp(KeyCode.LeftControl))
+        else if (crouchReleased)
         {
             isCrouching = false;
             controller.height = originalHeight;
+        }
+    }
+
+    private Vector2 GetMoveAxis()
+    {
+        if (inputService != null)
+        {
+            return inputService.MoveAxis;
+        }
+
+        return new Vector2(Input.GetAxis("Horizontal"), Input.GetAxis("Vertical"));
+    }
+
+    private bool IsGamePaused()
+    {
+        if (gameStateService != null)
+            return gameStateService.IsGamePaused;
+
+        return GameStateManager.Instance != null && GameStateManager.Instance.IsGamePaused;
+    }
+
+    private void CacheServices()
+    {
+        if (inputService == null)
+        {
+            if (!GameServiceLocator.TryGet(out inputService))
+            {
+                inputService = FindObjectOfType<PlayerInputService>();
+                if (inputService != null)
+                {
+                    GameServiceLocator.Register<IPlayerInputService>(inputService);
+                }
+            }
+        }
+
+        if (gameStateService == null)
+        {
+            if (!GameServiceLocator.TryGet(out gameStateService))
+            {
+                gameStateService = FindObjectOfType<GameStateManager>();
+                if (gameStateService != null)
+                {
+                    GameServiceLocator.Register<IGameStateService>(gameStateService);
+                }
+            }
         }
     }
 }

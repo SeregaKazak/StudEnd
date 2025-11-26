@@ -1,4 +1,3 @@
 repository "StudEnd/StudEnd@10171249049720@cloud"
   path "/"
-    br "/main"
-    co "/main"
+    smartbranch "/main"

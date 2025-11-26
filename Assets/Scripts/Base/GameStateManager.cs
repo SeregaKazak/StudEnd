@@ -1,6 +1,6 @@
 using UnityEngine;
 
-public class GameStateManager : MonoBehaviour
+public class GameStateManager : MonoBehaviour, IGameStateService
 {
     public static GameStateManager Instance { get; private set; }
     
@@ -13,10 +13,20 @@ public class GameStateManager : MonoBehaviour
         {
             Instance = this;
             DontDestroyOnLoad(gameObject);
+            GameServiceLocator.Register<IGameStateService>(this);
         }
         else
         {
             Destroy(gameObject);
+        }
+    }
+
+    private void OnDestroy()
+    {
+        if (Instance == this)
+        {
+            GameServiceLocator.Unregister<IGameStateService>();
+            Instance = null;
         }
     }
     
